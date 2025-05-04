@@ -26,13 +26,13 @@ import { useToast } from "@/components/ui/use-toast";
 // Define types for our data
 interface Assignment {
   id: string;
-  user_name: string;
-  title: string;
+  user_name: string | null;
   content: string | null;
   submitted_at: string | null;
   status: string;
   score: number | null;
   user_id: string | null;
+  assignment_id: string | null;
 }
 
 const Dashboard = () => {
@@ -67,12 +67,12 @@ const Dashboard = () => {
         const formattedAssignments = data.map(item => ({
           id: item.id,
           user_name: item.user_name || 'Unknown',
-          title: item.title || `Assignment ID: ${item.assignment_id}`,
           content: item.content,
           submitted_at: item.submitted_at,
           status: item.status,
           score: item.score,
-          user_id: item.user_id
+          user_id: item.user_id,
+          assignment_id: item.assignment_id
         }));
 
         setAssignments(formattedAssignments);
@@ -103,7 +103,7 @@ const Dashboard = () => {
     .filter((assignment) => {
       const matchesSearch =
         (assignment.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-        assignment.title.toLowerCase().includes(searchTerm.toLowerCase());
+        (assignment.assignment_id?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
       
       if (statusFilter === "all") return matchesSearch;
       return matchesSearch && assignment.status === statusFilter;
@@ -152,7 +152,7 @@ const Dashboard = () => {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-1 gap-4">
             <Input
-              placeholder="Search by name or title"
+              placeholder="Search by name or assignment ID"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-sm"
@@ -193,7 +193,7 @@ const Dashboard = () => {
                     >
                       Student Name {sortField === "user_name" && (sortDirection === "asc" ? "↑" : "↓")}
                     </TableHead>
-                    <TableHead>Assignment Title</TableHead>
+                    <TableHead>Assignment ID</TableHead>
                     <TableHead 
                       className="cursor-pointer"
                       onClick={() => handleSort("submitted_at")}
@@ -219,7 +219,7 @@ const Dashboard = () => {
                   {filteredAssignments.map((assignment) => (
                     <TableRow key={assignment.id}>
                       <TableCell className="font-medium">{assignment.user_name}</TableCell>
-                      <TableCell>{assignment.title}</TableCell>
+                      <TableCell>{assignment.assignment_id || 'Unknown'}</TableCell>
                       <TableCell>{formatDate(assignment.submitted_at)}</TableCell>
                       <TableCell>
                         <span
