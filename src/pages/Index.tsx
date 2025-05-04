@@ -6,7 +6,12 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    navigate("/login");
+    const adminUser = localStorage.getItem('admin_user');
+    if (adminUser) {
+      navigate("/dashboard");
+    } else {
+      navigate("/login");
+    }
   }, [navigate]);
 
   return (

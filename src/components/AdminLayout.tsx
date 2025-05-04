@@ -1,5 +1,5 @@
 
-import { useState, ReactNode } from "react";
+import { useState, ReactNode, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,9 +20,25 @@ const AdminLayout = ({ children, title }: AdminLayoutProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [adminEmail, setAdminEmail] = useState<string>("");
+
+  // Check if admin is logged in
+  useEffect(() => {
+    const adminUser = localStorage.getItem('admin_user');
+    if (!adminUser) {
+      navigate("/login");
+    } else {
+      try {
+        const parsedUser = JSON.parse(adminUser);
+        setAdminEmail(parsedUser.email || "Admin");
+      } catch (e) {
+        console.error("Error parsing admin user", e);
+      }
+    }
+  }, [navigate]);
 
   const handleLogout = () => {
-    // This will be replaced with actual Supabase logout logic
+    localStorage.removeItem('admin_user');
     toast({
       title: "Logged out",
       description: "You have been successfully logged out",
@@ -90,16 +106,19 @@ const AdminLayout = ({ children, title }: AdminLayoutProps) => {
         <header className="bg-white shadow-sm">
           <div className="px-6 py-4 flex justify-between items-center">
             <h1 className="text-2xl font-bold text-admin-primary">{title}</h1>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="rounded-full h-10 w-10">
-                  👤
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">{adminEmail}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="rounded-full h-10 w-10">
+                    👤
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </header>
 

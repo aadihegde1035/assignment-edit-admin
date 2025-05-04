@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -19,25 +20,50 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // This is a placeholder for Supabase auth
-      // We'll implement actual authentication after connecting to Supabase
-      console.log("Login attempt with:", email, password);
-      
-      // Simulating a successful login for now
-      setTimeout(() => {
+      // Check if admin user exists with the provided email and password
+      const { data: adminUsers, error: fetchError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (fetchError || !adminUsers) {
         toast({
-          title: "Please connect Supabase",
-          description: "Authentication requires Supabase integration",
+          title: "Login failed",
+          description: "Invalid email or password",
+          variant: "destructive",
         });
         setIsLoading(false);
-      }, 1000);
+        return;
+      }
+
+      // In a real app, we would hash the password and compare
+      // This is a simplified implementation
+      if (adminUsers.password_hash === password) {
+        // Store admin info in localStorage for session management
+        localStorage.setItem('admin_user', JSON.stringify(adminUsers));
+        
+        toast({
+          title: "Login successful",
+          description: "Welcome to the admin dashboard",
+        });
+        
+        navigate("/dashboard");
+      } else {
+        toast({
+          title: "Login failed",
+          description: "Invalid email or password",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Login error:", error);
       toast({
         title: "Login failed",
-        description: "Please check your credentials and try again",
+        description: "An error occurred during authentication",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };

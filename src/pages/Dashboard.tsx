@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,56 +20,80 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
-// This is placeholder data to be replaced with actual data from Supabase
-const placeholderAssignments = [
-  {
-    id: 1,
-    user_name: "John Doe",
-    title: "Math Assignment 1",
-    content: "Solutions to algebra problems...",
-    submitted_at: "2023-05-10T14:30:00",
-    status: "pending",
-    score: null,
-  },
-  {
-    id: 2,
-    user_name: "Jane Smith",
-    title: "Physics Lab Report",
-    content: "Experimental results and analysis...",
-    submitted_at: "2023-05-09T09:15:00",
-    status: "scored",
-    score: 85,
-  },
-  {
-    id: 3,
-    user_name: "Alex Johnson",
-    title: "History Essay",
-    content: "Analysis of World War II causes...",
-    submitted_at: "2023-05-08T16:45:00",
-    status: "scored",
-    score: 92,
-  },
-  {
-    id: 4,
-    user_name: "Sarah Williams",
-    title: "Chemistry Report",
-    content: "Chemical reactions documentation...",
-    submitted_at: "2023-05-11T11:20:00",
-    status: "pending",
-    score: null,
-  },
-];
+// Define types for our data
+interface Assignment {
+  id: string;
+  user_name: string;
+  title: string;
+  content: string | null;
+  submitted_at: string | null;
+  status: string;
+  score: number | null;
+  user_id: string | null;
+}
 
 const Dashboard = () => {
-  const [assignments, setAssignments] = useState(placeholderAssignments);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("submitted_at");
   const [sortDirection, setSortDirection] = useState("desc");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Check if admin is logged in
+  useEffect(() => {
+    const adminUser = localStorage.getItem('admin_user');
+    if (!adminUser) {
+      navigate("/login");
+    }
+  }, [navigate]);
+
+  // Fetch assignments from Supabase
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_assignments')
+          .select('*');
+
+        if (error) throw error;
+
+        // Transform data if needed
+        const formattedAssignments = data.map(item => ({
+          id: item.id,
+          user_name: item.user_name || 'Unknown',
+          title: item.title || `Assignment ID: ${item.assignment_id}`,
+          content: item.content,
+          submitted_at: item.submitted_at,
+          status: item.status,
+          score: item.score,
+          user_id: item.user_id
+        }));
+
+        setAssignments(formattedAssignments);
+      } catch (error) {
+        console.error("Error fetching assignments:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load assignments",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAssignments();
+  }, [toast]);
 
   // Format date string to a readable format
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
     return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
@@ -77,7 +102,7 @@ const Dashboard = () => {
   const filteredAssignments = assignments
     .filter((assignment) => {
       const matchesSearch =
-        assignment.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (assignment.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
         assignment.title.toLowerCase().includes(searchTerm.toLowerCase());
       
       if (statusFilter === "all") return matchesSearch;
@@ -86,13 +111,13 @@ const Dashboard = () => {
     .sort((a, b) => {
       if (sortField === "user_name") {
         return sortDirection === "asc"
-          ? a.user_name.localeCompare(b.user_name)
-          : b.user_name.localeCompare(a.user_name);
+          ? (a.user_name || '').localeCompare(b.user_name || '')
+          : (b.user_name || '').localeCompare(a.user_name || '');
       }
       if (sortField === "submitted_at") {
-        return sortDirection === "asc"
-          ? new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime()
-          : new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+        const dateA = a.submitted_at ? new Date(a.submitted_at).getTime() : 0;
+        const dateB = b.submitted_at ? new Date(b.submitted_at).getTime() : 0;
+        return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
       }
       if (sortField === "status") {
         return sortDirection === "asc"
@@ -114,6 +139,10 @@ const Dashboard = () => {
       setSortField(field);
       setSortDirection("asc");
     }
+  };
+
+  const handleEditClick = (id: string) => {
+    navigate(`/edit-assignment/${id}`);
   };
 
   return (
@@ -150,78 +179,84 @@ const Dashboard = () => {
         {/* Assignments table */}
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead 
-                    className="cursor-pointer"
-                    onClick={() => handleSort("user_name")}
-                  >
-                    Student Name {sortField === "user_name" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead>Assignment Title</TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
-                    onClick={() => handleSort("submitted_at")}
-                  >
-                    Submission Date {sortField === "submitted_at" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
-                    onClick={() => handleSort("status")}
-                  >
-                    Status {sortField === "status" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("score")}
-                  >
-                    Score {sortField === "score" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAssignments.map((assignment) => (
-                  <TableRow key={assignment.id}>
-                    <TableCell className="font-medium">{assignment.user_name}</TableCell>
-                    <TableCell>{assignment.title}</TableCell>
-                    <TableCell>{formatDate(assignment.submitted_at)}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                          ${
-                            assignment.status === "pending"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-green-100 text-green-800"
-                          }`}
-                      >
-                        {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {assignment.score !== null ? assignment.score : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => console.log(`Edit assignment ${assignment.id}`)}
-                      >
-                        ✏️ Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredAssignments.length === 0 && (
+            {isLoading ? (
+              <div className="flex justify-center items-center py-10">
+                <p>Loading assignments...</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                      No assignments found
-                    </TableCell>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort("user_name")}
+                    >
+                      Student Name {sortField === "user_name" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </TableHead>
+                    <TableHead>Assignment Title</TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort("submitted_at")}
+                    >
+                      Submission Date {sortField === "submitted_at" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort("status")}
+                    >
+                      Status {sortField === "status" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer text-right"
+                      onClick={() => handleSort("score")}
+                    >
+                      Score {sortField === "score" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredAssignments.map((assignment) => (
+                    <TableRow key={assignment.id}>
+                      <TableCell className="font-medium">{assignment.user_name}</TableCell>
+                      <TableCell>{assignment.title}</TableCell>
+                      <TableCell>{formatDate(assignment.submitted_at)}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            ${
+                              assignment.status === "pending"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-green-100 text-green-800"
+                            }`}
+                        >
+                          {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {assignment.score !== null ? assignment.score : "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditClick(assignment.id)}
+                        >
+                          ✏️ Edit
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredAssignments.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                        No assignments found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
