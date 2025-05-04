@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -8,8 +7,10 @@ const Index = () => {
   useEffect(() => {
     const adminUser = localStorage.getItem('admin_user');
     if (adminUser) {
+      // If we have an admin user in local storage, redirect to dashboard
       navigate("/dashboard");
     } else {
+      // Otherwise redirect to login
       navigate("/login");
     }
   }, [navigate]);

@@ -20,7 +20,24 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // Use Supabase Auth to sign in
+      // First, check if the email exists in the admin_users table
+      const { data: adminUser, error: adminCheckError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (adminCheckError || !adminUser) {
+        toast({
+          title: "Login failed",
+          description: "This email is not registered as an admin",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Now authenticate with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -31,25 +48,8 @@ const Login = () => {
       }
 
       if (data.user) {
-        // Check if the user is an admin
-        const { data: adminData, error: adminError } = await supabase
-          .from('admin_users')
-          .select('*')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (adminError) {
-          throw adminError;
-        }
-
-        if (!adminData) {
-          // This user is not an admin
-          await supabase.auth.signOut();
-          throw new Error("This user is not authorized as an admin");
-        }
-
-        // Store admin info in localStorage for session management
-        localStorage.setItem('admin_user', JSON.stringify(adminData));
+        // Successfully authenticated with Supabase Auth and confirmed admin status
+        localStorage.setItem('admin_user', JSON.stringify(adminUser));
         
         toast({
           title: "Login successful",
